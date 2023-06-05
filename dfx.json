@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "canisters": {
+    "upload_file_rs_backend": {
+      "type": "rust",
+      "package": "upload_file_rs_backend",
+      "candid": "src/upload_file_rs_backend/upload_file_rs_backend.did"
+    },
+    "upload_file_rs_frontend": {
+      "type": "assets",
+      "source": [
+        "src/upload_file_rs_frontend/assets"
+      ],
+      "dependencies": [
+        "upload_file_rs_backend"
+      ]
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": "",
+      "args": ""
+    }
+  },
+  "output_env_file": ".env"
+}

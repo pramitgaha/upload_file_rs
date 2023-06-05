@@ -1,0 +1,4 @@
+[workspace]
+members = [
+    "src/upload_file_rs_backend",
+]
