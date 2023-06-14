@@ -1,0 +1,25 @@
+{
+  "name": "upload-file",
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "gen_can_test_interface": "bash ./scripts/gen_can_test_interface.sh",
+    "test-fsm": "npm run gen_can_test_interface && tape tests/file_scaling_manager.test.cjs",
+    "test-fs": "npm run gen_can_test_interface && tape tests/file_storage.test.cjs",
+    "test": "bash ./scripts/tests.sh"
+  },
+  "dependencies": {
+    "@dfinity/agent": "^0.15.3",
+    "@dfinity/auth-client": "^0.15.3",
+    "@dfinity/candid": "^0.15.3",
+    "@dfinity/identity": "^0.15.3",
+    "@dfinity/principal": "^0.15.3",
+    "crc-32": "^1.2.2",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "mime": "^3.0.0",
+    "sha256": "^0.2.0",
+    "tape": "^5.6.1"
+  }
+}

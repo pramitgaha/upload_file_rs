@@ -1,19 +1,15 @@
 {
   "version": 1,
   "canisters": {
-    "upload_file_rs_backend": {
-      "type": "rust",
-      "package": "upload_file_rs_backend",
-      "candid": "src/upload_file_rs_backend/upload_file_rs_backend.did"
+    "file_scaling_manager": {
+      "type": "custom",
+      "wasm": "wasm_files/file_scaling_manager.wasm.gz",
+      "candid": "src/file_scaling_manager/service.did"
     },
-    "upload_file_rs_frontend": {
-      "type": "assets",
-      "source": [
-        "src/upload_file_rs_frontend/assets"
-      ],
-      "dependencies": [
-        "upload_file_rs_backend"
-      ]
+    "file_storage": {
+      "type": "custom",
+      "wasm": "wasm_files/file_storage.wasm.gz",
+      "candid": "src/file_storage/file_storage.did"
     }
   },
   "defaults": {
