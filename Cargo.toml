@@ -1,2 +1,2 @@
 [workspace]
-members = ["src/file_scaling_manager", "src/file_storage"]
+members = ["src/file_storage"]
