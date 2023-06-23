@@ -89,8 +89,11 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
       content_encoding: { Identity: null },
       content_type: asset_content_type,
     });
+    checksum = 0
 
   const { Ok: asset } = await file_storage_actors.motoko.get(asset_id);
+  t.equal(asset.filename, "file.pdf");
+  t.equal(asset.content_type, asset_content_type);
 });
 
 test("FileStorage[motoko].version(): should return version number", async function (t) {
@@ -135,7 +138,10 @@ test("FileStorage[motoko].create_chunk(): should store chunk data of video file 
   chunk_ids = await Promise.all(promises);
 
   const hasChunkIds = chunk_ids.length > 2;
-
+  // for (let i = 0; i < chunk_ids.length; i++){
+  //   let chunk_check = await file_storage_actors.motoko.get_chunk_detail(chunk_ids[i]);
+  //   t.equal(chunk_check, true)
+  // }
   t.equal(hasChunkIds, true);
 });
 
@@ -161,7 +167,6 @@ test("FileStorage[dom].commit_batch(): should return error not authorized since 
 
 test("FileStorage[motoko].commit_batch(): should start formation of asset to be stored", async function (t) {
   const file_path = "tests/data/bots.mp4";
-
   const asset_filename = path.basename(file_path);
   const asset_content_type = mime.getType(file_path);
 
@@ -180,97 +185,97 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
   t.equal(asset.content_size, 14272571);
 });
 
-// test("FileStorage[motoko].commit_batch(): should err => Invalid Chunk Id", async function (t) {
-//   const file_path = "tests/data/bots.mp4";
+test("FileStorage[motoko].commit_batch(): should err => Invalid Checksum: Chunk Missing", async function (t) {
+  const file_path = "tests/data/bots.mp4";
 
-//   const asset_filename = path.basename(file_path);
-//   const asset_content_type = mime.getType(file_path);
+  const asset_filename = path.basename(file_path);
+  const asset_content_type = mime.getType(file_path);
 
-//   const { Ok: asset_id, Err: error } =
-//     await file_storage_actors.motoko.commit_batch(batch_id, chunk_ids, {
-//       filename: asset_filename,
-//       checksum: checksum,
-//       content_encoding: { Identity: null },
-//       content_type: asset_content_type,
-//     });
+  const { Ok: asset_id, Err: error } =
+    await file_storage_actors.motoko.commit_batch(batch_id, [],{
+      filename: asset_filename,
+      checksum: checksum,
+      content_encoding: { Identity: null },
+      content_type: asset_content_type,
+    });
 
-//   checksum = 0;
+  checksum = 0;
 
-//   t.equal(error, "Invalid Chunk Id");
-// });
+  t.equal(error, "Invalid Checksum: Chunk Missing");
+});
 
-// test("FileStorage[motoko].create_chunk(): should store chunk data of image file to canister", async function (t) {
-//   batch_id = Math.random().toString(36).substring(2, 7);
+test("FileStorage[motoko].create_chunk(): should store chunk data of image file to canister", async function (t) {
+  batch_id = Math.random().toString(36).substring(2, 7);
 
-//   const uploadChunk = async ({ chunk, order }) => {
-//     return file_storage_actors.motoko.create_chunk(batch_id, chunk, order);
-//   };
+  const uploadChunk = async ({ chunk, order }) => {
+    return file_storage_actors.motoko.create_chunk(batch_id, chunk, order);
+  };
 
-//   const file_path = "tests/data/poked_3.jpeg";
+  const file_path = "tests/data/poked_3.jpeg";
 
-//   const asset_buffer = fs.readFileSync(file_path);
-//   const asset_unit8Array = new Uint8Array(asset_buffer);
+  const asset_buffer = fs.readFileSync(file_path);
+  const asset_unit8Array = new Uint8Array(asset_buffer);
 
-//   const promises = [];
-//   const chunkSize = 2000000;
+  const promises = [];
+  const chunkSize = 2000000;
 
-//   for (
-//     let start = 0, index = 0;
-//     start < asset_unit8Array.length;
-//     start += chunkSize, index++
-//   ) {
-//     const chunk = asset_unit8Array.slice(start, start + chunkSize);
+  for (
+    let start = 0, index = 0;
+    start < asset_unit8Array.length;
+    start += chunkSize, index++
+  ) {
+    const chunk = asset_unit8Array.slice(start, start + chunkSize);
 
-//     checksum = updateChecksum(chunk, checksum);
+    checksum = updateChecksum(chunk, checksum);
 
-//     promises.push(
-//       uploadChunk({
-//         chunk,
-//         order: index,
-//       })
-//     );
-//   }
+    promises.push(
+      uploadChunk({
+        chunk,
+        order: index,
+      })
+    );
+  }
 
-//   chunk_ids = await Promise.all(promises);
+  chunk_ids = await Promise.all(promises);
 
-//   const hasChunkIds = chunk_ids.length > 2;
+  const hasChunkIds = chunk_ids.length > 2;
 
-//   t.equal(hasChunkIds, true);
-// });
+  t.equal(hasChunkIds, true);
+});
 
-// test("FileStorage[motoko].commit_batch(): should start formation of asset to be stored", async function (t) {
-//   const file_path = "tests/data/poked_3.jpeg";
+test("FileStorage[motoko].commit_batch(): should start formation of asset to be stored", async function (t) {
+  const file_path = "tests/data/poked_3.jpeg";
 
-//   const asset_filename = path.basename(file_path);
-//   const asset_content_type = mime.getType(file_path);
+  const asset_filename = path.basename(file_path);
+  const asset_content_type = mime.getType(file_path);
 
-//   const { Ok: asset_id } = await file_storage_actors.motoko.commit_batch(
-//     batch_id,
-//     chunk_ids,
-//     {
-//       filename: asset_filename,
-//       checksum: checksum,
-//       content_encoding: { Identity: null },
-//       content_type: asset_content_type,
-//     }
-//   );
+  const { Ok: asset_id } = await file_storage_actors.motoko.commit_batch(
+    batch_id,
+    chunk_ids,
+    {
+      filename: asset_filename,
+      checksum: checksum,
+      content_encoding: { Identity: null },
+      content_type: asset_content_type,
+    }
+  );
 
-//   checksum = 0;
+  checksum = 0;
 
-//   const { Ok: asset } = await file_storage_actors.motoko.get(asset_id);
+  const { Ok: asset } = await file_storage_actors.motoko.get(asset_id);
 
-//   t.equal(asset.filename, "poked_3.jpeg");
-//   t.equal(asset.content_type, "image/jpeg");
-//   t.equal(asset.content_size, 8169010);
-// });
+  t.equal(asset.filename, "poked_3.jpeg");
+  t.equal(asset.content_type, "image/jpeg");
+  t.equal(asset.content_size, 8169010);
+});
 
-// // test("FileStorage[motoko].assets_list(): should return all assets without file content data since it would be too large", async function (t) {
-// //   const { ok: asset_list } = await file_storage_actors.motoko.assets_list();
+test("FileStorage[motoko].assets_list(): should return all assets without file content data since it would be too large", async function (t) {
+  const asset_list = await file_storage_actors.motoko.assets_list();
 
-// //   const hasAssets = asset_list.length > 1;
+  const hasAssets = asset_list.length > 1;
 
-// //   t.equal(hasAssets, true);
-// // });
+  t.equal(hasAssets, true);
+});
 
 // // test("FileStorage[motoko].delete_asset(): should delete an asset", async function (t) {
 // //   // Upload an asset

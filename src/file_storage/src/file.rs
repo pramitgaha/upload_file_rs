@@ -140,6 +140,27 @@ pub fn commit_batch(
 
 #[query]
 #[candid_method(query)]
+pub fn assets_list() -> HashMap<AssetID, AssetQuery>{
+    CHUNK_STATE.with(|state|{
+        let state = state.borrow();
+        state.assets.iter().map(|(key, asset)| (key.clone(), AssetQuery::from(asset))).collect()
+    })
+}
+
+#[query]
+#[candid_method(query)]
+pub fn get_chunk_detail(chunk_id: u32) -> bool{
+    CHUNK_STATE.with(|state|{
+        let state = state.borrow();
+        match state.chunks.get(&chunk_id){
+            None => false,
+            Some(_chunk) => true
+        }
+    })
+}
+
+#[query]
+#[candid_method(query)]
 pub fn get(asset_id: String) -> Result<AssetQuery, String> {
     CHUNK_STATE.with(|state| {
         let state = state.borrow();

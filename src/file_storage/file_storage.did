@@ -36,7 +36,7 @@ type StreamingCallbackHttpResponse = record {
   body : vec nat8;
 };
 type StreamingCallbackToken = record {
-  chunk_index : nat;
+  chunk_index : nat32;
   asset_id : text;
   content_encoding : text;
 };
@@ -47,9 +47,11 @@ type StreamingStrategy = variant {
   };
 };
 service : {
+  assets_list : () -> (vec record { text; AssetQuery }) query;
   commit_batch : (text, vec nat32, AssetProperties) -> (Result);
   create_chunk : (text, vec nat8, nat32) -> (nat32);
   get : (text) -> (Result_1) query;
+  get_chunk_detail : (nat32) -> (bool) query;
   http_request : (HttpRequest) -> (HttpResponse) query;
   http_request_streaming_callback : (StreamingCallbackToken) -> (
       StreamingCallbackHttpResponse,

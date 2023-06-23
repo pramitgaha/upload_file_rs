@@ -2,6 +2,7 @@ use ic_cdk_macros::*;
 use candid::{export_service, Nat};
 use crate::types::*;
 
+use std::collections::HashMap;
 #[query(name = "__get_candid_interface_tmp_hack")]
 fn export_candid() -> String {
     export_service!();
