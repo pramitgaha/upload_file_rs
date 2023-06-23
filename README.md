@@ -19,6 +19,9 @@ If you want to start working on your project right away, you might want to try t
 ```bash
 cd upload_file_rs/
 dfx help
+
+rustup target add wasm32-unknown-unknown
+
 dfx canister --help
 ```
 

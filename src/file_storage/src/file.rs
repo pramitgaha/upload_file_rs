@@ -55,20 +55,35 @@ pub fn create_chunk(batch_id: String, content: Blob, order:u32) -> u32 {
         let mut state = state.borrow_mut();
         let id = state.increment();
         let checksum: u32 = crc32fast::hash(&content);
+
         let asset_chunk = AssetChunk {
             batch_id,
             checksum,
             content,
             created_at: ic_cdk::api::time(),
             file_name: "".to_string(),
-            id: id.clone(),
+            id,
             order,
             owner: ic_cdk::caller(),
         };
+
         state.chunks.insert(id, asset_chunk);
         id
     })
 }
+
+fn validate_chunks(chunk_ids: &[u32], batch_id: &str, caller: Principal, state: &mut ChunkState) -> Result<Vec<AssetChunk>, String> {
+    let mut chunks_to_commit = Vec::new();
+    for &chunk_id in chunk_ids {
+        match state.chunks.get(&chunk_id) {
+            None => return Err("Invalid Chunk Id".to_string()),
+            Some(chunk) if chunk.batch_id == batch_id && chunk.owner == caller => chunks_to_commit.push(chunk.clone()),
+            _ => return Err("Not Owner of Chunk".to_string()),
+        }
+    }
+    Ok(chunks_to_commit)
+}
+
 
 #[update]
 #[candid_method(update)]
@@ -83,43 +98,33 @@ pub fn commit_batch(
         let mut state = state.borrow_mut();
         let asset_id = state.get_asset_id();
         let canister_id = ic_cdk::id();
-        let mut chunks_to_commit: Vec<AssetChunk> = Vec::new();
-        let mut asset_content: Vec<Blob> = Vec::new();
+        
+        // NOTES: remove chunk_ids, although it is more direct in reading 
+        // it also adds something else the UI will need to keep track of
+        let mut chunks_to_commit = validate_chunks(&chunk_ids, &batch_id, caller, &mut state)?;
+
+        chunks_to_commit.sort_by_key(|chunk| chunk.order);
+        ic_cdk::println!("{:?}", chunks_to_commit.iter().map(|chunk| chunk.order).collect::<Vec<_>>());
+
+        let mut asset_content = Vec::new();
         let mut content_size = 0;
         let mut asset_checksum = 0;
         let modulo_value = 400_000_000;
-        for chunk_id in chunk_ids.iter() {
-            match state.chunks.get(chunk_id) {
-                None => return Err("Invalid Chunk Id".to_string()),
-                Some(chunk) => {
-                    if chunk.batch_id == batch_id {
-                        if chunk.owner != caller {
-                            return Err("Not Owner of Chunk".to_string());
-                        }
-                        chunks_to_commit.push(chunk.clone())
-                    }
-                }
-            }
-        }
-        for chunk in chunks_to_commit.iter(){
-            ic_cdk::println!("{}", chunk.order)
-        }
-        chunks_to_commit.sort_by_key(|chunk| chunk.order );
-        for chunk in chunks_to_commit.iter(){
-            ic_cdk::println!("{}", chunk.order)
-        }
+        
         for chunk in chunks_to_commit.iter() {
-            ic_cdk::println!("{}", chunk.order);
             asset_content.push(chunk.content.clone());
             asset_checksum = (asset_checksum + chunk.checksum) % modulo_value;
             content_size += chunk.content.len();
         }
+        
         if asset_checksum != asset_properties.checksum {
             return Err("Invalid Checksum: Chunk Missing".to_string());
         }
+
         for chunk in chunks_to_commit.iter() {
             state.chunks.remove(&chunk.id);
         }
+
         let asset = Asset {
             canister_id,
             chunk_size: asset_content.len() as u32,
@@ -133,6 +138,7 @@ pub fn commit_batch(
             owner: caller.to_string(),
             url: generate_url(asset_id.clone(), state.in_production),
         };
+        
         state.assets.insert(asset_id.clone(), asset);
         Ok(asset_id)
     })
@@ -210,37 +216,38 @@ fn create_strategy(arg: CreateStrategyArgs) -> Option<StreamingStrategy> {
     }
 }
 
-fn create_token(arg: CreateStrategyArgs) -> Option<StreamingCallbackToken>{
-    let v = arg.chunk_index.clone() + 1;
-    if v >= arg.data_chunks_size{
+fn create_token(arg: CreateStrategyArgs) -> Option<StreamingCallbackToken> {
+    let v = arg.chunk_index + 1;
+    if v >= arg.data_chunks_size {
         return None
     }
-    Some(StreamingCallbackToken{
+    Some(StreamingCallbackToken {
         asset_id: arg.asset_id,
-        chunk_index: arg.chunk_index.clone() + 1,
+        chunk_index: v,
         content_encoding: "gzip".to_string()
     })
 }
 
 #[query]
 #[candid_method(query)]
-pub fn http_request_streaming_callback(token_arg: StreamingCallbackToken) -> StreamingCallbackHttpResponse{
-    CHUNK_STATE.with(|state|{
+pub fn http_request_streaming_callback(token_arg: StreamingCallbackToken) -> StreamingCallbackHttpResponse {
+    CHUNK_STATE.with(|state| {
         let state = state.borrow();
-        match state.assets.get(&token_arg.asset_id){
-            None => panic!("asset id not found"),
-            Some(asset) => {
-                let arg = CreateStrategyArgs{
-                    asset_id: token_arg.asset_id.clone(),
-                    chunk_index: token_arg.chunk_index,
-                    data_chunks_size: Nat::from(asset.chunk_size.clone()),
-                };
-                let token = create_token(arg);
-                StreamingCallbackHttpResponse{
-                    token,
-                    body: asset.content.clone().unwrap()[token_arg.chunk_index as usize].clone()
-                }
+
+        if let Some(asset) = state.assets.get(&token_arg.asset_id) {
+            let arg = CreateStrategyArgs {
+                asset_id: token_arg.asset_id,
+                chunk_index: token_arg.chunk_index,
+                data_chunks_size: Nat::from(asset.chunk_size),
+            };
+            let token = create_token(arg);
+
+            StreamingCallbackHttpResponse {
+                token,
+                body: asset.content.as_ref().map(|content| content[token_arg.chunk_index as usize].clone()),
             }
+        } else {
+            panic!("Asset ID not found");
         }
     })
 }

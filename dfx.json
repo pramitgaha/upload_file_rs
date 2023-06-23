@@ -1,11 +1,6 @@
 {
   "version": 1,
   "canisters": {
-    "file_scaling_manager": {
-      "type": "custom",
-      "wasm": "wasm_files/file_scaling_manager.wasm.gz",
-      "candid": "src/file_scaling_manager/service.did"
-    },
     "file_storage": {
       "type": "custom",
       "wasm": "wasm_files/file_storage.wasm.gz",

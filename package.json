@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "gen_can_test_interface": "bash ./scripts/gen_can_test_interface.sh",
-    "test-fsm": "npm run gen_can_test_interface && tape tests/file_scaling_manager.test.cjs",
     "test-fs": "npm run gen_can_test_interface && tape tests/file_storage.test.cjs",
     "test": "bash ./scripts/tests.sh"
   },
