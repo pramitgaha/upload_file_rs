@@ -30,6 +30,8 @@ dfx canister --help
 If you want to test your project locally, you can use the following commands:
 
 ```bash
+# build the file
+./build_script.sh
 # Starts the replica, running in the background
 dfx start --background
 
