@@ -5,7 +5,7 @@ pub type ChunkID = u32;
 pub type AssetID = String;
 pub type Blob = Vec<u8>;
 
-#[derive(CandidType, Clone)]
+#[derive(CandidType, Clone, Deserialize)]
 pub struct AssetChunk {
     pub batch_id: String,
     pub checksum: u32,
@@ -31,7 +31,7 @@ pub struct AssetProperties {
     pub checksum: u32,
 }
 
-#[derive(CandidType, Clone)]
+#[derive(CandidType, Clone, Deserialize)]
 pub struct Asset {
     pub content: Option<Vec<Blob>>,
     pub canister_id: Principal,

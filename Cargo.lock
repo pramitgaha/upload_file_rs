@@ -282,6 +282,13 @@ dependencies = [
 [[package]]
 name = "file_scaling_manager"
 version = "0.1.0"
+dependencies = [
+ "candid",
+ "crc32fast",
+ "ic-cdk",
+ "ic-cdk-macros",
+ "serde",
+]
 
 [[package]]
 name = "file_storage"
@@ -347,9 +354,9 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "ic-cdk"
-version = "0.8.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1faa7b42964694fb38d7f62172e0d8261381e39ce85b4d6b519929f7cad9b4fb"
+checksum = "ff1375116689aeeffdc6e96ec8ed1953671aee1dcd01016ab86e0606e93bec94"
 dependencies = [
  "candid",
  "ic-cdk-macros",

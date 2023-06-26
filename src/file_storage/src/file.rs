@@ -1,7 +1,8 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use candid::{candid_method, Nat, Func};
+use candid::{candid_method, Nat, Func, CandidType};
 use ic_cdk_macros::*;
+use serde::Deserialize;
 
 use crate::{
     types::{
@@ -11,6 +12,7 @@ use crate::{
     utils::{generate_url, get_asset_id},
 };
 
+#[derive(CandidType, Deserialize)]
 pub struct ChunkState {
     pub in_production: bool,
     pub chunk_count: u32,
@@ -264,4 +266,17 @@ pub fn http_request_streaming_callback(token_arg: StreamingCallbackToken) -> Str
             }
         }
     })
+}
+
+// canister management
+#[pre_upgrade]
+pub fn pre_upgrade(){
+    let state = CHUNK_STATE.with(|state| state.take());
+    ic_cdk::storage::stable_save((state,)).expect("failed");
+}
+
+#[post_upgrade]
+pub fn post_upgrade(){
+    let state: (ChunkState,) = ic_cdk::storage::stable_restore().expect("failed");
+    CHUNK_STATE.with(|s| s.replace(state.0));
 }
