@@ -23,7 +23,6 @@ const { getActor } = require("./actor.cjs");
 let file_storage_actors = {};
 
 let chunk_ids = [];
-let batch_id = "";
 let checksum = 0;
 
 test("Setup Actors", async function (t) {
@@ -43,9 +42,8 @@ test("Setup Actors", async function (t) {
 });
 
 test("pdf upload", async function(t){
-  batch_id = Math.random().toString(36).substring(2, 7);
   const uploadChunk = async({chunk, order}) => {
-    return file_storage_actors.motoko.create_chunk(batch_id, chunk, order);
+    return file_storage_actors.motoko.create_chunk(chunk, order);
   };
   const file_path = "tests/data/file.pdf";
   const asset_buffer = fs.readFileSync(file_path);
@@ -83,7 +81,7 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
   const asset_content_type = mime.getType(file_path);
 
   const { Ok: asset_id, Err: error } =
-    await file_storage_actors.motoko.commit_batch(batch_id, chunk_ids, {
+    await file_storage_actors.motoko.commit_batch(chunk_ids, {
       filename: asset_filename,
       checksum: checksum,
       content_encoding: { Identity: null },
@@ -103,10 +101,10 @@ test("FileStorage[motoko].version(): should return version number", async functi
 });
 
 test("FileStorage[motoko].create_chunk(): should store chunk data of video file to canister", async function (t) {
-  batch_id = Math.random().toString(36).substring(2, 7);
+
 
   const uploadChunk = async ({ chunk, order }) => {
-    return file_storage_actors.motoko.create_chunk(batch_id, chunk, order);
+    return file_storage_actors.motoko.create_chunk(chunk, order);
   };
 
   const file_path = "tests/data/bots.mp4";
@@ -152,7 +150,7 @@ test("FileStorage[dom].commit_batch(): should return error not authorized since 
   const asset_content_type = mime.getType(file_path);
 
   const { Err: error } = await file_storage_actors.dom.commit_batch(
-    batch_id,
+
     chunk_ids,
     {
       filename: asset_filename,
@@ -171,7 +169,7 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
   const asset_content_type = mime.getType(file_path);
 
   const { Ok: asset_id, Err: error } =
-    await file_storage_actors.motoko.commit_batch(batch_id, chunk_ids, {
+    await file_storage_actors.motoko.commit_batch(chunk_ids, {
       filename: asset_filename,
       checksum: checksum,
       content_encoding: { Identity: null },
@@ -192,7 +190,7 @@ test("FileStorage[motoko].commit_batch(): should err => Invalid Checksum: Chunk 
   const asset_content_type = mime.getType(file_path);
 
   const { Ok: asset_id, Err: error } =
-    await file_storage_actors.motoko.commit_batch(batch_id, [],{
+    await file_storage_actors.motoko.commit_batch([],{
       filename: asset_filename,
       checksum: checksum,
       content_encoding: { Identity: null },
@@ -205,10 +203,9 @@ test("FileStorage[motoko].commit_batch(): should err => Invalid Checksum: Chunk 
 });
 
 test("FileStorage[motoko].create_chunk(): should store chunk data of image file to canister", async function (t) {
-  batch_id = Math.random().toString(36).substring(2, 7);
 
   const uploadChunk = async ({ chunk, order }) => {
-    return file_storage_actors.motoko.create_chunk(batch_id, chunk, order);
+    return file_storage_actors.motoko.create_chunk(chunk, order);
   };
 
   const file_path = "tests/data/poked_3.jpeg";
@@ -250,7 +247,6 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
   const asset_content_type = mime.getType(file_path);
 
   const { Ok: asset_id } = await file_storage_actors.motoko.commit_batch(
-    batch_id,
     chunk_ids,
     {
       filename: asset_filename,

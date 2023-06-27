@@ -52,13 +52,12 @@ thread_local! {
 
 #[update]
 #[candid_method(update)]
-pub fn create_chunk(batch_id: String, content: Blob, order:u32) -> u32 {
+pub fn create_chunk(content: Blob, order:u32) -> u32 {
     CHUNK_STATE.with(|state| {
         let mut state = state.borrow_mut();
         let id = state.increment();
         let checksum: u32 = crc32fast::hash(&content);
         let asset_chunk = AssetChunk {
-            batch_id,
             checksum,
             content,
             created_at: ic_cdk::api::time(),
@@ -75,7 +74,6 @@ pub fn create_chunk(batch_id: String, content: Blob, order:u32) -> u32 {
 #[update]
 #[candid_method(update)]
 pub fn commit_batch(
-    batch_id: String,
     chunk_ids: Vec<u32>,
     asset_properties: AssetProperties,
 ) -> Result<AssetID, String> {
@@ -94,12 +92,10 @@ pub fn commit_batch(
             match state.chunks.get(chunk_id) {
                 None => return Err("Invalid Chunk Id".to_string()),
                 Some(chunk) => {
-                    if chunk.batch_id == batch_id {
                         if chunk.owner != caller {
                             return Err("Not Owner of Chunk".to_string());
                         }
                         chunks_to_commit.push(chunk.clone())
-                    }
                 }
             }
         }

@@ -7,7 +7,6 @@ pub type Blob = Vec<u8>;
 
 #[derive(CandidType, Clone, Deserialize)]
 pub struct AssetChunk {
-    pub batch_id: String,
     pub checksum: u32,
     pub content: Blob,
     pub created_at: u64,
