@@ -41,7 +41,7 @@ pub struct Asset {
     pub content_size: u32,
     pub created_at: u64,
     pub id: String,
-    pub owner: String,
+    pub owner: Principal,
     pub url: String,
 }
 
@@ -55,7 +55,7 @@ pub struct AssetQuery {
     pub content_size: u32,
     pub created_at: u64,
     pub id: String,
-    pub owner: String,
+    pub owner: Principal,
     pub url: String,
 }
 

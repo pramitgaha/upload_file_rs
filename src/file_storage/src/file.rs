@@ -128,7 +128,7 @@ pub fn commit_batch(
             content_size: content_size as u32,
             created_at: ic_cdk::api::time(),
             id: asset_id.clone(),
-            owner: caller.to_string(),
+            owner: caller,
             url: generate_url(asset_id.clone(), state.in_production),
         };
         state.assets.insert(asset_id.clone(), asset);
@@ -147,12 +147,31 @@ pub fn assets_list() -> HashMap<AssetID, AssetQuery>{
 
 #[query]
 #[candid_method(query)]
-pub fn get_chunk_detail(chunk_id: u32) -> bool{
+pub fn chunk_availabity_check(chunk_id: u32) -> bool{
     CHUNK_STATE.with(|state|{
         let state = state.borrow();
         match state.chunks.get(&chunk_id){
             None => false,
             Some(_chunk) => true
+        }
+    })
+}
+
+#[update]
+#[candid_method(update)]
+pub fn delete_asset(asset_id: AssetID) -> Result<String, String>{
+    let caller = ic_cdk::caller();
+    CHUNK_STATE.with(|state|{
+        let mut state = state.borrow_mut();
+        match state.assets.get(&asset_id){
+            None => return Err("Invalid asset id".to_string()),
+            Some(asset) => {
+                if asset.owner != caller{
+                    return Err("Unauthorized".to_string())
+                }
+                state.assets.remove(&asset_id);
+                Ok("Success".to_string())
+            }
         }
     })
 }

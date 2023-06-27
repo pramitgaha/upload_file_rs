@@ -273,44 +273,42 @@ test("FileStorage[motoko].assets_list(): should return all assets without file c
   t.equal(hasAssets, true);
 });
 
-// test("FileStorage[motoko].delete_asset(): should delete an asset", async function (t) {
-//   // Upload an asset
-//   const file_path = "tests/data/poked_1.jpeg";
-//   const asset_buffer = fs.readFileSync(file_path);
-//   const asset_unit8Array = new Uint8Array(asset_buffer);
-//   const asset_filename = path.basename(file_path);
-//   const asset_content_type = mime.getType(file_path);
-//   const batch_id = Math.random().toString(36).substring(2, 7);
+test("FileStorage[motoko].delete_asset(): should delete an asset", async function (t) {
+  // Upload an asset
+  const file_path = "tests/data/poked_1.jpeg";
+  const asset_buffer = fs.readFileSync(file_path);
+  const asset_unit8Array = new Uint8Array(asset_buffer);
+  const asset_filename = path.basename(file_path);
+  const asset_content_type = mime.getType(file_path);
 
-//   checksum = updateChecksum(asset_buffer, checksum);
+  checksum = updateChecksum(asset_buffer, checksum);
 
-//   const chunk_id = await file_storage_actors.motoko.create_chunk(
-//     batch_id,
-//     asset_unit8Array,
-//     0
-//   );
-//   const { Ok: asset_id } = await file_storage_actors.motoko.commit_batch(
-//     batch_id,
-//     [chunk_id],
-//     {
-//       filename: asset_filename,
-//       checksum: checksum,
-//       content_encoding: { Identity: null },
-//       content_type: asset_content_type,
-//     }
-//   );
+  const chunk_id = await file_storage_actors.motoko.create_chunk(
+    asset_unit8Array,
+    0
+  );
+  const { Ok: asset_id } = await file_storage_actors.motoko.commit_batch(
+    [chunk_id],
+    {
+      filename: asset_filename,
+      checksum: checksum,
+      content_encoding: { Identity: null },
+      content_type: asset_content_type,
+    }
+  );
 
   // Delete the asset
-  // const { ok: delete_result } = await file_storage_actors.motoko.delete_asset(
-  //   asset_id
-  // );
-  // t.equal(delete_result, "Asset deleted successfully.");
+  const { Ok: delete_result } = await file_storage_actors.motoko.delete_asset(
+    asset_id
+  );
+  t.equal(delete_result, "Success");
 
   // Check if the asset is no longer in the assets list
-//   const { ok: asset_list } = await file_storage_actors.motoko.assets_list();
-//   const deleted_asset = asset_list.find((asset) => asset.id === asset_id);
-//   t.equal(deleted_asset, undefined);
-// });
+  const asset_list = await file_storage_actors.motoko.assets_list();
+  // console.log(asset_list);
+  const deleted_asset = asset_list.find((asset) => asset.id === asset_id);
+  t.equal(deleted_asset, undefined);
+});
 
 // test("FileStorage[motoko].start_clear_expired_chunks(): should start clearing chunks cron job", async function (t) {
 //   const timer_id =
