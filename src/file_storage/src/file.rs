@@ -280,3 +280,21 @@ pub fn post_upgrade(){
     let state: (ChunkState,) = ic_cdk::storage::stable_restore().expect("failed");
     CHUNK_STATE.with(|s| s.replace(state.0));
 }
+
+#[update]
+#[candid_method(update)]
+pub async fn is_full() -> bool{
+    // let info: ic_cdk::api::management_canister::main::CanisterInfoResponse = ic_cdk::call(Principal::management_canister(), "", args)
+    let arg = ic_cdk::api::management_canister::main::CanisterIdRecord{
+        canister_id: ic_cdk::id()
+    };
+    let (info,) = ic_cdk::api::management_canister::main::canister_status(arg).await.unwrap();
+    ic_cdk::println!("{:?}", info);
+    let two_gb: u64 = 2147483648;
+    let max_size = Nat::from(two_gb);
+    if info.memory_size >= max_size{
+        true
+    }else{
+        false
+    }
+}

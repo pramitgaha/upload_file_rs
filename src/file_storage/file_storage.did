@@ -56,5 +56,6 @@ service : {
   http_request_streaming_callback : (StreamingCallbackToken) -> (
       StreamingCallbackHttpResponse,
     ) query;
+  is_full : () -> (bool);
   version : () -> (nat) query;
 }
