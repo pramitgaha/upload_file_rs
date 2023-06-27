@@ -74,7 +74,7 @@ pub fn create_chunk(content: Blob, order:u32) -> u32 {
 #[update]
 #[candid_method(update)]
 pub fn commit_batch(
-    chunk_ids: Vec<u32>,
+    mut chunk_ids: Vec<u32>,
     asset_properties: AssetProperties,
 ) -> Result<AssetID, String> {
     ic_cdk::println!("{:?}", chunk_ids);
@@ -95,7 +95,7 @@ pub fn commit_batch(
                         if chunk.owner != caller {
                             return Err("Not Owner of Chunk".to_string());
                         }
-                        chunks_to_commit.push(chunk.clone())
+                        chunks_to_commit.push(chunk.clone());
                 }
             }
         }
@@ -103,9 +103,9 @@ pub fn commit_batch(
             ic_cdk::println!("{}", chunk.order)
         }
         chunks_to_commit.sort_by_key(|chunk| chunk.order );
-        for chunk in chunks_to_commit.iter(){
-            ic_cdk::println!("{}", chunk.order)
-        }
+        // for chunk in chunks_to_commit.iter(){
+        //     ic_cdk::println!("{}", chunk.order)
+        // }
         for chunk in chunks_to_commit.iter() {
             ic_cdk::println!("{}", chunk.order);
             asset_content.push(chunk.content.clone());
