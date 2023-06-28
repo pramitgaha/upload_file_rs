@@ -74,16 +74,15 @@ pub fn create_chunk(content: Blob, order:u32) -> u32 {
 #[update]
 #[candid_method(update)]
 pub fn commit_batch(
-    mut chunk_ids: Vec<u32>,
+    chunk_ids: Vec<u32>,
     asset_properties: AssetProperties,
 ) -> Result<AssetID, String> {
-    ic_cdk::println!("{:?}", chunk_ids);
     let caller = ic_cdk::caller();
     CHUNK_STATE.with(|state| {
         let mut state = state.borrow_mut();
         let asset_id = state.get_asset_id();
         let canister_id = ic_cdk::id();
-        let mut chunks_to_commit: Vec<AssetChunk> = Vec::new();
+        let mut chunks_to_commit: Vec<(ChunkID, u32)> = Vec::new();
         let mut asset_content: Vec<Blob> = Vec::new();
         let mut content_size = 0;
         let mut asset_checksum = 0;
@@ -95,19 +94,15 @@ pub fn commit_batch(
                         if chunk.owner != caller {
                             return Err("Not Owner of Chunk".to_string());
                         }
-                        chunks_to_commit.push(chunk.clone());
+                        chunks_to_commit.push((chunk.id, chunk.order));
                 }
             }
         }
-        for chunk in chunks_to_commit.iter(){
-            ic_cdk::println!("{}", chunk.order)
-        }
-        chunks_to_commit.sort_by_key(|chunk| chunk.order );
-        // for chunk in chunks_to_commit.iter(){
-        //     ic_cdk::println!("{}", chunk.order)
-        // }
-        for chunk in chunks_to_commit.iter() {
-            ic_cdk::println!("{}", chunk.order);
+        ic_cdk::println!("{:?}", chunks_to_commit);
+        chunks_to_commit.sort_by_key(|chunk| chunk.1 );
+        ic_cdk::println!("{:?}", chunks_to_commit);
+        for (chunkid, _order) in chunks_to_commit.iter() {
+            let chunk = state.chunks.get(chunkid).unwrap();
             asset_content.push(chunk.content.clone());
             asset_checksum = (asset_checksum + chunk.checksum) % modulo_value;
             content_size += chunk.content.len();
@@ -116,7 +111,7 @@ pub fn commit_batch(
             return Err("Invalid Checksum: Chunk Missing".to_string());
         }
         for chunk in chunks_to_commit.iter() {
-            state.chunks.remove(&chunk.id);
+            state.chunks.remove(&chunk.0);
         }
         let asset = Asset {
             canister_id,
