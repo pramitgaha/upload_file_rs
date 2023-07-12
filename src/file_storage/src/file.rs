@@ -61,7 +61,6 @@ pub fn create_chunk(content: Blob, order:u32) -> u32 {
             checksum,
             content,
             created_at: ic_cdk::api::time(),
-            file_name: "".to_string(),
             id: id.clone(),
             order,
             owner: ic_cdk::caller(),

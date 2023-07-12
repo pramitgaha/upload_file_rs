@@ -10,7 +10,6 @@ pub struct AssetChunk {
     pub checksum: u32,
     pub content: Blob,
     pub created_at: u64,
-    pub file_name: String,
     pub id: u32,
     pub order: u32,
     pub owner: Principal,
