@@ -1,24 +1,25 @@
 use std::{cell::RefCell, collections::HashMap};
-
-use candid::{candid_method, Nat, Func, CandidType};
+use candid::{candid_method, Nat, Func};
 use ic_cdk_macros::*;
-use serde::Deserialize;
-
+use serde::{Deserialize, Serialize};
+use ic_stable_structures::{StableBTreeMap, memory_manager::MemoryManager, DefaultMemoryImpl, writer::Writer, Memory};
 use crate::{
     types::{
-        Asset, AssetChunk, AssetID, AssetProperties, AssetQuery, Blob, ChunkID, CreateStrategyArgs,
+        Asset, AssetChunk, AssetProperties, AssetQuery, Blob, ChunkID, CreateStrategyArgs,
         HeaderField, HttpRequest, HttpResponse, StreamingStrategy, StreamingCallbackToken, StreamingCallbackHttpResponse,
     },
-    utils::{generate_url, get_asset_id},
+    utils::{generate_url, get_asset_id}, memory::{StableMemory, init_chunk_stable_data, init_asset_stable_data},
 };
 
-#[derive(CandidType, Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ChunkState {
     pub in_production: bool,
     pub chunk_count: u32,
-    pub chunks: HashMap<ChunkID, AssetChunk>,
+    #[serde(skip, default = "init_chunk_stable_data")]
+    pub chunks: StableBTreeMap<ChunkID, AssetChunk, StableMemory>,
     pub asset_count: u128,
-    pub assets: HashMap<AssetID, Asset>,
+    #[serde(skip, default = "init_asset_stable_data")]
+    pub assets: StableBTreeMap<u128, Asset, StableMemory>,
 }
 
 impl Default for ChunkState {
@@ -26,9 +27,9 @@ impl Default for ChunkState {
         Self {
             in_production: false,
             chunk_count: 0,
-            chunks: HashMap::new(),
+            chunks: init_chunk_stable_data(),
             asset_count: 0,
-            assets: HashMap::new(),
+            assets: init_asset_stable_data(),
         }
     }
 }
@@ -39,21 +40,23 @@ impl ChunkState {
         self.chunk_count
     }
 
-    fn get_asset_id(&mut self) -> String {
+    fn get_asset_id(&mut self) -> u128 {
         let id = self.asset_count;
         self.asset_count += 1;
-        format!("{}", id)
+        id
     }
 }
 
 thread_local! {
-    pub static CHUNK_STATE: RefCell<ChunkState> = RefCell::default();
+    pub static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
+    RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
+    pub static STATE: RefCell<ChunkState> = RefCell::default();
 }
 
 #[update]
 #[candid_method(update)]
 pub fn create_chunk(content: Blob, order:u32) -> u32 {
-    CHUNK_STATE.with(|state| {
+    STATE.with(|state| {
         let mut state = state.borrow_mut();
         let id = state.increment();
         let checksum: u32 = crc32fast::hash(&content);
@@ -75,8 +78,8 @@ pub fn create_chunk(content: Blob, order:u32) -> u32 {
 pub fn commit_batch(
     chunk_ids: Vec<u32>,
     asset_properties: AssetProperties,
-) -> Result<AssetID, String> {
-    CHUNK_STATE.with(|state| {
+) -> Result<u128, String> {
+    STATE.with(|state| {
         let mut state = state.borrow_mut();
         let caller = ic_cdk::caller();
 
@@ -127,11 +130,11 @@ pub fn commit_batch(
             filename: asset_properties.filename,
             content_size: content_size as u32,
             created_at: ic_cdk::api::time(),
-            id: asset_id.clone(),
+            id: asset_id,
             owner: caller,
-            url: generate_url(asset_id.clone(), state.in_production),
+            url: generate_url(asset_id, state.in_production),
         };
-        state.assets.insert(asset_id.clone(), asset);
+        state.assets.insert(asset_id, asset);
 
         Ok(asset_id)
     })
@@ -139,17 +142,17 @@ pub fn commit_batch(
 
 #[query]
 #[candid_method(query)]
-pub fn assets_list() -> HashMap<AssetID, AssetQuery>{
-    CHUNK_STATE.with(|state|{
+pub fn assets_list() -> HashMap<u128, AssetQuery>{
+    STATE.with(|state|{
         let state = state.borrow();
-        state.assets.iter().map(|(key, asset)| (key.clone(), AssetQuery::from(asset))).collect()
+        state.assets.iter().map(|(key, asset)| (key.clone(), AssetQuery::from(&asset))).collect()
     })
 }
 
 #[query]
 #[candid_method(query)]
 pub fn chunk_availabity_check(chunk_id: u32) -> bool{
-    CHUNK_STATE.with(|state|{
+    STATE.with(|state|{
         let state = state.borrow();
         match state.chunks.get(&chunk_id){
             None => false,
@@ -160,9 +163,9 @@ pub fn chunk_availabity_check(chunk_id: u32) -> bool{
 
 #[update]
 #[candid_method(update)]
-pub fn delete_asset(asset_id: AssetID) -> Result<String, String>{
+pub fn delete_asset(asset_id: u128) -> Result<String, String>{
     let caller = ic_cdk::caller();
-    CHUNK_STATE.with(|state|{
+    STATE.with(|state|{
         let mut state = state.borrow_mut();
         match state.assets.get(&asset_id){
             None => return Err("Invalid asset id".to_string()),
@@ -179,12 +182,12 @@ pub fn delete_asset(asset_id: AssetID) -> Result<String, String>{
 
 #[query]
 #[candid_method(query)]
-pub fn get(asset_id: String) -> Result<AssetQuery, String> {
-    CHUNK_STATE.with(|state| {
+pub fn get(asset_id: u128) -> Result<AssetQuery, String> {
+    STATE.with(|state| {
         let state = state.borrow();
         match state.assets.get(&asset_id) {
             None => Err("Asset Not Found".to_string()),
-            Some(asset) => Ok(AssetQuery::from(asset)),
+            Some(asset) => Ok(AssetQuery::from(&asset)),
         }
     })
 }
@@ -196,13 +199,12 @@ pub fn version() -> Nat {
 }
 
 // http working
-
 #[query]
 #[candid_method(query)]
 pub fn http_request(request: HttpRequest) -> HttpResponse {
     let not_found = b"Asset Not Found".to_vec();
     let asset_id = get_asset_id(request.url);
-    CHUNK_STATE.with(|state| {
+    STATE.with(|state| {
         let state = state.borrow();
         match state.assets.get(&asset_id) {
             None => HttpResponse {
@@ -264,7 +266,7 @@ fn create_token(arg: CreateStrategyArgs) -> Option<StreamingCallbackToken>{
 #[query]
 #[candid_method(query)]
 pub fn http_request_streaming_callback(token_arg: StreamingCallbackToken) -> StreamingCallbackHttpResponse{
-    CHUNK_STATE.with(|state|{
+    STATE.with(|state|{
         let state = state.borrow();
         match state.assets.get(&token_arg.asset_id){
             None => panic!("asset id not found"),
@@ -287,14 +289,34 @@ pub fn http_request_streaming_callback(token_arg: StreamingCallbackToken) -> Str
 // canister management
 #[pre_upgrade]
 pub fn pre_upgrade(){
-    let state = CHUNK_STATE.with(|state| state.take());
-    ic_cdk::storage::stable_save((state,)).expect("failed");
+    let mut state_bytes = vec![];
+    STATE
+        .with(|s| ciborium::ser::into_writer(&*s.borrow(), &mut state_bytes))
+        .expect("failed to encode state");
+    // Write the length of the serialized bytes to memory, followed by the
+    // by the bytes themselves.
+    let len = state_bytes.len() as u32;
+    let mut memory = crate::memory::get_upgrades_memory();
+    let mut writer = Writer::new(&mut memory, 0);
+    writer.write(&len.to_le_bytes()).expect("failed to write length");
+    writer.write(&state_bytes).expect("failed to write bytes");
 }
+
 
 #[post_upgrade]
 pub fn post_upgrade(){
-    let state: (ChunkState,) = ic_cdk::storage::stable_restore().expect("failed");
-    CHUNK_STATE.with(|s| s.replace(state.0));
+    let memory = crate::memory::get_upgrades_memory();
+    // Read the length of the state bytes.
+    let mut state_len_bytes = [0; 4];
+    memory.read(0, &mut state_len_bytes);
+    let state_len = u32::from_le_bytes(state_len_bytes) as usize;
+    // Read the bytes
+    let mut state_bytes = vec![0; state_len];
+    memory.read(4, &mut state_bytes);
+    // Deserialize and set the state.
+    let state: ChunkState =
+        ciborium::de::from_reader(&*state_bytes).expect("failed to decode state");
+    STATE.with(|s| *s.borrow_mut() = state);
 }
 
 #[update]
@@ -306,8 +328,8 @@ pub async fn is_full() -> bool{
     };
     let (info,) = ic_cdk::api::management_canister::main::canister_status(arg).await.unwrap();
     ic_cdk::println!("{:?}", info);
-    let two_gb: u64 = 2147483648;
-    let max_size = Nat::from(two_gb);
+    let fourty_gb: u64 = 40 * 1024 * 1024 * 8;
+    let max_size = Nat::from(fourty_gb);
     if info.memory_size >= max_size{
         true
     }else{
