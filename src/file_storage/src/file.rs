@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use ic_stable_structures::{StableBTreeMap, memory_manager::MemoryManager, DefaultMemoryImpl, writer::Writer, Memory};
 use crate::{
     types::{
-        Asset, AssetChunk, AssetProperties, AssetQuery, Blob, ChunkID, CreateStrategyArgs,
-        HeaderField, HttpRequest, HttpResponse, StreamingStrategy, StreamingCallbackToken, StreamingCallbackHttpResponse,
+        Asset, AssetChunk, AssetProperties, AssetQuery, ChunkID, CreateStrategyArgs,
+        HeaderField, HttpRequest, HttpResponse, StreamingStrategy, StreamingCallbackToken, StreamingCallbackHttpResponse, Blob, Content,
     },
-    utils::{generate_url, get_asset_id}, memory::{StableMemory, init_chunk_stable_data, init_asset_stable_data},
+    utils::{generate_url, get_asset_id}, memory::{StableMemory, init_chunk_stable_data, init_asset_stable_data, init_content_stable_data},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -55,11 +55,12 @@ thread_local! {
 
 #[update]
 #[candid_method(update)]
-pub fn create_chunk(content: Blob, order:u32) -> u32 {
+pub fn create_chunk(content: Vec<u8>, order:u32) -> u32 {
     STATE.with(|state| {
         let mut state = state.borrow_mut();
         let id = state.increment();
         let checksum: u32 = crc32fast::hash(&content);
+        let content = content.iter().map(|b| b.clone()).collect();
         let asset_chunk = AssetChunk {
             checksum,
             content,
@@ -98,12 +99,13 @@ pub fn commit_batch(
 
         // Accumulate content and compute checksum
         let modulo_value = 400_000_000;
-        let mut asset_content = Vec::new();
+        let mut asset_content = init_content_stable_data();
         let mut asset_checksum = 0;
         let mut content_size = 0;
         for (chunk_id, _) in chunks_to_commit.iter() {
             let chunk = state.chunks.get(chunk_id).unwrap();
-            asset_content.push(chunk.content.clone());
+            ic_cdk::println!("{}", chunk.order);
+            asset_content.insert(chunk.order, Content(chunk.content.clone()));
             asset_checksum = (asset_checksum + chunk.checksum) % modulo_value;
             content_size += chunk.content.len();
         }
@@ -124,7 +126,7 @@ pub fn commit_batch(
         let asset = Asset {
             canister_id,
             chunk_size: asset_content.len() as u32,
-            content: Some(asset_content),
+            content: asset_content,
             content_encoding: asset_properties.content_encoding,
             content_type: asset_properties.content_type,
             filename: asset_properties.filename,
@@ -187,7 +189,9 @@ pub fn get(asset_id: u128) -> Result<AssetQuery, String> {
         let state = state.borrow();
         match state.assets.get(&asset_id) {
             None => Err("Asset Not Found".to_string()),
-            Some(asset) => Ok(AssetQuery::from(&asset)),
+            Some(ref asset) => {
+                Ok(AssetQuery::from(asset))
+            },
         }
     })
 }
@@ -200,9 +204,9 @@ pub fn version() -> Nat {
 
 // http working
 #[query]
-#[candid_method(query)]
+// #[candid_method(query)]
 pub fn http_request(request: HttpRequest) -> HttpResponse {
-    let not_found = b"Asset Not Found".to_vec();
+    let not_found = b"Asset Not Found".iter().map(|b| b.clone()).collect();
     let asset_id = get_asset_id(request.url);
     STATE.with(|state| {
         let state = state.borrow();
@@ -216,7 +220,7 @@ pub fn http_request(request: HttpRequest) -> HttpResponse {
             Some(asset) => {
                 let filename = format!("attachment; filename={}", asset.filename);
                 HttpResponse {
-                    body: asset.content.clone().unwrap()[0].clone(),
+                    body: asset.content.get(&0).unwrap().0.clone(),
                     status_code: 200,
                     headers: vec![
                         HeaderField("Content-Type".to_string(), asset.content_type.clone()),
@@ -279,7 +283,7 @@ pub fn http_request_streaming_callback(token_arg: StreamingCallbackToken) -> Str
                 let token = create_token(arg);
                 StreamingCallbackHttpResponse{
                     token,
-                    body: asset.content.clone().unwrap()[token_arg.chunk_index as usize].clone()
+                    body: asset.content.get(&token_arg.chunk_index).unwrap().0.clone()
                 }
             }
         }
@@ -328,7 +332,7 @@ pub async fn is_full() -> bool{
     };
     let (info,) = ic_cdk::api::management_canister::main::canister_status(arg).await.unwrap();
     ic_cdk::println!("{:?}", info);
-    let fourty_gb: u64 = 40 * 1024 * 1024 * 8;
+    let fourty_gb: u64 = 40 * 1024 * 1024 * 1024;
     let max_size = Nat::from(fourty_gb);
     if info.memory_size >= max_size{
         true

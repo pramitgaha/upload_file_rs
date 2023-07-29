@@ -1,6 +1,10 @@
+use std::collections::{HashMap, HashSet};
+
 use candid::{CandidType, Nat, Principal, Func, Encode, Decode};
-use ic_stable_structures::{Storable, BoundedStorable};
+use ic_stable_structures::{Storable, BoundedStorable, StableBTreeMap, StableVec};
 use serde::{Deserialize, Serialize};
+
+use crate::memory::{StableMemory, init_content_stable_data};
 
 pub type ChunkID = u32;
 pub type Blob = Vec<u8>;
@@ -30,7 +34,7 @@ impl BoundedStorable for AssetChunk{
     const MAX_SIZE: u32 = 2100000;
 }
 
-#[derive(CandidType, Clone, Deserialize, Serialize)]
+#[derive(CandidType, Clone, Deserialize, Serialize, Debug)]
 pub enum ContentEncoding {
     Identity,
     GZIP,
@@ -74,9 +78,28 @@ impl BoundedStorable for AssetProperties{
     const MAX_SIZE: u32 = 100;
 }
 
-#[derive(CandidType, Clone, Deserialize, Serialize)]
+#[derive(CandidType, Deserialize)]
+pub struct Content(pub Vec<u8>);
+
+impl Storable for Content{
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        std::borrow::Cow::Owned(Encode!(self).unwrap())
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+}
+
+impl BoundedStorable for Content{
+    const IS_FIXED_SIZE: bool = false;
+    const MAX_SIZE: u32 = 2 * 1024 * 1023 + 100;
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct Asset {
-    pub content: Option<Vec<Blob>>,
+    #[serde(skip, default = "init_content_stable_data")]
+    pub content: StableBTreeMap<u32, Content, StableMemory>,
     pub canister_id: Principal,
     pub chunk_size: u32,
     pub content_encoding: ContentEncoding,
@@ -91,17 +114,20 @@ pub struct Asset {
 
 impl Storable for Asset{
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
+        ciborium::de::from_reader(bytes.as_ref()).unwrap()
     }
 
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(Encode!(&self).unwrap())
+        let mut bytes = vec![];
+        ciborium::ser::into_writer(self, &mut bytes).unwrap();
+        std::borrow::Cow::Owned(bytes)
     }
 }
 
 impl BoundedStorable for Asset{
     const IS_FIXED_SIZE: bool = false;
-    const MAX_SIZE: u32 = u32::MAX;
+    /// 200mb, tried out with bigger amount throws out error
+    const MAX_SIZE: u32 = 200 * 1024 * 1024;
 }
 
 #[derive(CandidType, Clone)]
@@ -150,7 +176,7 @@ pub struct HttpRequest{
 pub struct HttpResponse{
     pub status_code: u16,
     pub headers: Vec<HeaderField>,
-    pub body: Blob,
+    pub body: Vec<u8>,
     pub streaming_strategy: Option<StreamingStrategy>,
 }
 
@@ -178,6 +204,6 @@ pub enum StreamingStrategy{
 
 #[derive(CandidType, Deserialize, Clone)]
 pub struct StreamingCallbackHttpResponse{
-    pub body: Blob,
+    pub body: Vec<u8>,
     pub token: Option<StreamingCallbackToken>,
 }

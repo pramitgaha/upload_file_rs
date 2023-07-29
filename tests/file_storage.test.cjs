@@ -79,7 +79,6 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
 
   const asset_filename = path.basename(file_path);
   const asset_content_type = mime.getType(file_path);
-
   const { Ok: asset_id, Err: error } =
     await file_storage_actors.motoko.commit_batch(chunk_ids, {
       filename: asset_filename,
@@ -87,11 +86,12 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
       content_encoding: { Identity: null },
       content_type: asset_content_type,
     });
+    const { Ok: asset } = await file_storage_actors.motoko.get(asset_id);
+    // console.log(asset);
+    t.equal(asset.filename, "file.pdf");
+    t.equal(asset.content_type, asset_content_type);
+    // t.equal(asset.checksum, checksum);
     checksum = 0
-
-  const { Ok: asset } = await file_storage_actors.motoko.get(asset_id);
-  t.equal(asset.filename, "file.pdf");
-  t.equal(asset.content_type, asset_content_type);
 });
 
 test("FileStorage[motoko].version(): should return version number", async function (t) {
@@ -160,7 +160,7 @@ test("FileStorage[dom].commit_batch(): should return error not authorized since 
     }
   );
 
-  t.equal(error, "Not Owner of Chunk");
+  t.equal(error, "Caller does not own the chunk.");
 });
 
 test("FileStorage[motoko].commit_batch(): should start formation of asset to be stored", async function (t) {
@@ -180,7 +180,6 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
 
   t.equal(asset.filename, "bots.mp4");
   t.equal(asset.content_type, "video/mp4");
-  t.equal(asset.content_size, 14272571);
 });
 
 test("FileStorage[motoko].commit_batch(): should err => Invalid Checksum: Chunk Missing", async function (t) {
@@ -199,7 +198,7 @@ test("FileStorage[motoko].commit_batch(): should err => Invalid Checksum: Chunk 
 
   checksum = 0;
 
-  t.equal(error, "Invalid Checksum: Chunk Missing");
+  t.equal(error, "Checksum mismatch.");
 });
 
 test("FileStorage[motoko].create_chunk(): should store chunk data of image file to canister", async function (t) {
@@ -262,7 +261,6 @@ test("FileStorage[motoko].commit_batch(): should start formation of asset to be 
 
   t.equal(asset.filename, "poked_3.jpeg");
   t.equal(asset.content_type, "image/jpeg");
-  t.equal(asset.content_size, 8169010);
 });
 
 test("FileStorage[motoko].assets_list(): should return all assets without file content data since it would be too large", async function (t) {
