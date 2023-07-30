@@ -113,3 +113,57 @@ pub fn get_asset(id: u128) -> AssetQuery{
 pub fn asset_list() -> HashMap<u128, AssetQuery>{
     STATE.with(|state| state.borrow().assets.iter().map(|(id, asset)| (id, AssetQuery::from(&asset))).collect())
 }
+
+#[update]
+#[candid_method(update)]
+pub fn insert_chunk(){
+   STATE.with(|state|{
+        let mut state = state.borrow_mut();
+        for id in 0..100{
+            let chunk = Chunk{
+                content: [0; 2000].to_vec(),
+                order: 1,
+                owner: ic_cdk::id(),
+                created_at: ic_cdk::api::time(),
+                checksum: 200,
+                id: 10        
+           };
+            state.chunks.insert(id, chunk);
+        }
+   })
+}
+
+#[update]
+#[candid_method(update)]
+pub fn insert_asset(){
+    STATE.with(|state|{
+        let mut state = state.borrow_mut();
+        for id in 0..100{
+            let asset = Asset{
+                content: [0; 4000].to_vec(),
+                file_name: "".into(),
+                owner: Principal::anonymous(),
+                content_encoding: ContentEncoding::GZIP,
+                url: "".to_string(),
+                id: 100,
+                content_type: "".into()
+            };
+            state.assets.insert(id, asset);
+        }
+   })
+}
+
+#[update]
+#[candid_method(update)]
+pub fn increase_pages(n: u64) -> bool{
+    match ic_cdk::api::stable::stable64_grow(n){
+        Ok(res) => {
+            ic_cdk::println!("{}", res);
+            true
+        },
+        Err(e) => {
+            ic_cdk::println!("{:?}", e);
+            false
+        }
+    }
+}

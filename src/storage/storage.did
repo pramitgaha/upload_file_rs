@@ -17,11 +17,14 @@ type ChunkArg = record { content : vec nat8; order : nat32 };
 type ContentEncoding = variant { GZIP; Identity };
 service : () -> {
   asset_list : () -> (vec record { nat; AssetQuery }) query;
+  asset_memory_size : () -> ();
   chunk_availability_check : (vec nat) -> (bool) query;
+  chunk_memory_size : () -> ();
   clear_expired_chunks : () -> ();
   commit_batch : (AssetArg) -> (nat);
   delete_asset : (nat) -> (bool);
   get_asset : (nat) -> (AssetQuery) query;
+  increase_pages : (nat64) -> (bool);
   insert_asset : () -> ();
   insert_chunk : () -> ();
   is_full : () -> (bool);

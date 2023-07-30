@@ -4,7 +4,7 @@ use crate::types::{Asset, Chunk, State};
 use candid::{candid_method, Nat};
 use ic_cdk_macros::{init, update};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
+use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap, Memory};
 
 // A memory for upgrades, where data from the heap can be serialized/deserialized.
 const UPGRADES: MemoryId = MemoryId::new(0);
@@ -13,6 +13,24 @@ const UPGRADES: MemoryId = MemoryId::new(0);
 // every additional stable structure.
 const STABLE_CHUNK_BTREE: MemoryId = MemoryId::new(1);
 const STABLE_ASSET_BTREE: MemoryId = MemoryId::new(2);
+
+#[update]
+#[candid_method(update)]
+pub fn chunk_memory_size(){
+    let s = MEMORY_MANAGER.with(|m| m.borrow().get(STABLE_CHUNK_BTREE));
+    // s.grow(100000);
+    let size = s.size();
+    ic_cdk::println!("{}", size);
+}
+
+#[update]
+#[candid_method(update)]
+pub fn asset_memory_size(){
+    let s = MEMORY_MANAGER.with(|m| m.borrow().get(STABLE_ASSET_BTREE));
+    // s.grow(100000);
+    let size = s.size();
+    ic_cdk::println!("{}", size);
+}
 
 pub type StableMemory = VirtualMemory<DefaultMemoryImpl>;
 
