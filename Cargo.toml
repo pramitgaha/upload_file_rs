@@ -1,5 +1,4 @@
 [workspace]
 members = [
-    "src/file_scaling_manager",
-    "src/file_storage",
+    "src/*",
 ]
