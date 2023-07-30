@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use candid::{candid_method, CandidType};
-use ic_cdk_macros::{update, query};
+use ic_cdk_macros::{query, update};
 use ic_stable_memory::collections::SHashMap;
 // use ic_stable_structures::BoundedStorable;
 
 use crate::{
     memory::STATE,
-    types::{ContentEncoding, AssetQuery, StableAsset, StableString},
+    types::{AssetQuery, ContentEncoding, StableAsset, StableString},
     utils::generate_url,
 };
 
@@ -31,6 +31,7 @@ pub fn commit_batch(args: AssetArg) -> u128 {
         let mut chunks_to_commit = vec![];
         let mut chunks_not_found = vec![];
         let mut chunks_not_owned = vec![];
+
         args.chunk_ids
             .iter()
             .for_each(|id| match state.chunks.get(id) {
@@ -38,7 +39,8 @@ pub fn commit_batch(args: AssetArg) -> u128 {
                 Some(chunk) if chunk.owner != caller => chunks_not_owned.push(id.clone()),
                 Some(chunk) => chunks_to_commit.push((id.clone(), chunk.order)),
             });
-        if chunks_to_commit.len() == 0{
+
+        if chunks_to_commit.len() == 0 {
             ic_cdk::trap("No chunks found")
         }
         if chunks_not_found.len() > 0 {
@@ -49,19 +51,32 @@ pub fn commit_batch(args: AssetArg) -> u128 {
             let error_msg = format!("Chunks not owned: {:?}", chunks_not_owned);
             ic_cdk::trap(&error_msg)
         }
+
         let mut checksum: u32 = 0;
-        let mut content = SHashMap::new_with_capacity(chunks_to_commit.len()).expect("Failed to allocate memory");
+        let mut content =
+            SHashMap::new_with_capacity(chunks_to_commit.len()).expect("Failed to allocate memory");
         let mut chunk_size = 0;
+
         chunks_to_commit.sort_by_key(|chunks| chunks.1);
+
         chunks_to_commit.iter().for_each(|(id, _)| {
             let chunk = state.chunks.remove(id).unwrap();
+
+            content
+                .insert(chunk.order, chunk.content)
+                .expect("failed to insert");
+
             checksum = (checksum + chunk.checksum) % MODULO_VALUE;
+
+            ic_cdk::print(chunk.order.to_string());
+            ic_cdk::print(checksum.to_string());
+
             chunk_size += 1;
-            content.insert(chunk.order, chunk.content).expect("failed to insert");
         });
+
         if args.checksum != checksum {
             let error_msg = format!("Checksum mismatch: {} != {}", args.checksum, checksum);
-            ic_cdk::trap(&error_msg)
+            ic_cdk::trap(&error_msg);
         }
         // if content.len() as u32 > <Asset as BoundedStorable>::MAX_SIZE {
         //     ic_cdk::trap("Exceeds allow file limit size")
@@ -102,20 +117,27 @@ pub fn delete_asset(id: u128) -> bool {
 
 #[query]
 #[candid_method(query)]
-pub fn get_asset(id: u128) -> AssetQuery{
-    STATE.with(|state|{
+pub fn get_asset(id: u128) -> AssetQuery {
+    STATE.with(|state| {
         let state = state.borrow();
-        match state.assets.get(&id){
+        match state.assets.get(&id) {
             None => ic_cdk::trap("Asset not found"),
-            Some(asset) => AssetQuery::from(&*asset)
+            Some(asset) => AssetQuery::from(&*asset),
         }
     })
 }
 
 #[query]
 #[candid_method(query)]
-pub fn asset_list() -> HashMap<u128, AssetQuery>{
-    STATE.with(|state| state.borrow().assets.iter().map(|(id, asset)| (*id, AssetQuery::from(&*asset))).collect())
+pub fn asset_list() -> HashMap<u128, AssetQuery> {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .assets
+            .iter()
+            .map(|(id, asset)| (*id, AssetQuery::from(&*asset)))
+            .collect()
+    })
 }
 
 // #[update]
@@ -130,7 +152,7 @@ pub fn asset_list() -> HashMap<u128, AssetQuery>{
 //                 owner: ic_cdk::id(),
 //                 created_at: ic_cdk::api::time(),
 //                 checksum: 200,
-//                 id: 10        
+//                 id: 10
 //            };
 //             state.chunks.insert(id, chunk);
 //         }
