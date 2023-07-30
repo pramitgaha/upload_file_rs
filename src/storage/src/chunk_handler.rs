@@ -1,7 +1,7 @@
 use candid::{candid_method, CandidType};
 use ic_cdk_macros::{query, update};
 
-use crate::{memory::STATE, types::Chunk};
+use crate::{memory::STATE, types::{StableChunk, ChunkQuery}};
 
 #[derive(CandidType, serde::Deserialize)]
 pub struct ChunkArg {
@@ -16,8 +16,8 @@ pub fn upload_chunk(arg: ChunkArg) -> u128 {
     STATE.with(|state| {
         let mut state = state.borrow_mut();
         let id = state.get_chunk_id();
-        let chunk = Chunk::from((&caller, id, arg));
-        state.chunks.insert(id, chunk);
+        let chunk = StableChunk::from((&caller, id, arg));
+        state.chunks.insert(id, chunk).expect("failed to insert");
         id
     })
 }
@@ -44,11 +44,23 @@ pub fn clear_expired_chunks() {
     STATE.with(|state| {
         let mut state = state.borrow_mut();
         let mut chunks_to_delete = vec![];
-        state.chunks.iter().for_each(|(ref id, ref chunk)| {
+        state.chunks.iter().for_each(|(id, chunk)| {
             if chunk.created_at < time {
                 chunks_to_delete.push(id.clone());
             }
         });
         let _ = chunks_to_delete.iter().map(|id| state.chunks.remove(id));
     });
+}
+
+#[query]
+#[candid_method(query)]
+pub fn get_chunk(id: u128) -> ChunkQuery{
+    STATE.with(|state|{
+        let state = state.borrow();
+        match state.chunks.get(&id){
+            None => ic_cdk::trap("Chunk not found"),
+            Some(chunk) => ChunkQuery::from(&*chunk)
+        }
+    })
 }

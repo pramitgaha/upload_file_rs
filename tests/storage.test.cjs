@@ -69,9 +69,9 @@ test("Uploading PDF's chunks using IdentityA", async function (t) {
 
     chunk_ids = await Promise.all(promises);
 
-    // const hasChunkIds = chunk_ids.length > 2;
+    const hasChunkIds = chunk_ids.length > 2;
 
-    // t.equal(hasChunkIds, true);
+    t.equal(hasChunkIds, true);
     let response = await storage_actors.identityA.chunk_availability_check(chunk_ids);
     t.equal(response, true);
 });
@@ -87,8 +87,57 @@ test("Should start formation of PDF file", async function (t) {
         checksum: checksum,
         content_encoding: { Identity: null }
     });
-    const { Ok: asset } = await storage_actors.identityA.get_asset(id);
-    // t.equal(asset.file_name, asset_filename);
-    // t.equal(asset.content_type, asset_content_type);
+    const asset = await storage_actors.identityA.get_asset(id);
+    t.equal(asset.file_name, asset_filename);
+    t.equal(asset.content_type, asset_content_type);
+    console.log(asset)
+});
+
+test("Upload picture", async function(t){
+    const uploadChunk = async ({ content, order }) => {
+        return storage_actors.identityA.upload_chunk({ content, order });
+    };
+    let file_path = "tests/files/video2.mp4";
+    const asset_buffer = fs.readFileSync(file_path);
+    const asset_unit8Array = new Uint8Array(asset_buffer);
+    const promises = [];
+    const chunkSize = 2000000;
+    for (
+        let start = 0, index = 0;
+        start < asset_unit8Array.length;
+        start += chunkSize, index++
+    ) {
+        const chunk = asset_unit8Array.slice(start, start + chunkSize);
+        console.log(checksum)
+        checksum = updateChecksum(chunk, checksum);
+
+        promises.push(
+            uploadChunk({
+                content: chunk,
+                order: index,
+            })
+        );
+        console.log(index)
+    }
+    chunk_ids = await Promise.all(promises);
+    console.log(chunk_ids.length)
+    let response = await storage_actors.identityA.chunk_availability_check(chunk_ids);
+    t.equal(response, true);
+})
+
+test("Should start formation of picture", async function (t) {
+    const file_path = "test/files/video2.mp4";
+    const asset_filename = path.basename(file_path);
+    const asset_content_type = mime.getType(file_path);
+    let id = await storage_actors.identityA.commit_batch({
+        content_type: asset_content_type,
+        file_name: asset_filename,
+        chunk_ids: chunk_ids,
+        checksum: checksum,
+        content_encoding: { Identity: null }
+    });
+    const asset = await storage_actors.identityA.get_asset(id);
+    t.equal(asset.file_name, asset_filename);
+    t.equal(asset.content_type, asset_content_type);
     console.log(asset)
 });

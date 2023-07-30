@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use candid::{candid_method, CandidType, Principal};
+use candid::{candid_method, CandidType};
 use ic_cdk_macros::{update, query};
-use ic_stable_structures::BoundedStorable;
+use ic_stable_memory::collections::SHashMap;
+// use ic_stable_structures::BoundedStorable;
 
 use crate::{
     memory::STATE,
-    types::{Asset, ContentEncoding, AssetQuery, Chunk},
+    types::{ContentEncoding, AssetQuery, StableAsset, StableString},
     utils::generate_url,
 };
 
@@ -49,32 +50,35 @@ pub fn commit_batch(args: AssetArg) -> u128 {
             ic_cdk::trap(&error_msg)
         }
         let mut checksum: u32 = 0;
-        chunks_to_commit.sort_by_key(|data| data.1);
-        let mut content = vec![];
+        let mut content = SHashMap::new_with_capacity(chunks_to_commit.len()).expect("Failed to allocate memory");
+        let mut chunk_size = 0;
+        chunks_to_commit.sort_by_key(|chunks| chunks.1);
         chunks_to_commit.iter().for_each(|(id, _)| {
-            let chunk = state.chunks.get(id).unwrap();
+            let chunk = state.chunks.remove(id).unwrap();
             checksum = (checksum + chunk.checksum) % MODULO_VALUE;
-            content = [content.clone(), chunk.content].concat();
-            state.chunks.remove(id);
+            chunk_size += 1;
+            content.insert(chunk.order, chunk.content).expect("failed to insert");
         });
         if args.checksum != checksum {
-            ic_cdk::trap("Checksum Mismatch")
+            let error_msg = format!("Checksum mismatch: {} != {}", args.checksum, checksum);
+            ic_cdk::trap(&error_msg)
         }
-        if content.len() as u32 > <Asset as BoundedStorable>::MAX_SIZE {
-            ic_cdk::trap("Exceeds allow file limit size")
-        }
+        // if content.len() as u32 > <Asset as BoundedStorable>::MAX_SIZE {
+        //     ic_cdk::trap("Exceeds allow file limit size")
+        // }
         let id = state.get_asset_id();
         let url = generate_url(id);
-        let asset = Asset {
+        let asset = StableAsset {
             content,
             content_encoding: args.content_encoding,
-            file_name: args.file_name,
+            file_name: StableString::new(args.file_name).unwrap(),
             owner: caller,
+            chunk_size,
             url,
             id,
-            content_type: args.content_type,
+            content_type: StableString::new(args.content_type).unwrap(),
         };
-        state.assets.insert(id, asset);
+        state.assets.insert(id, asset).expect("failed to insert");
         id
     })
 }
@@ -103,7 +107,7 @@ pub fn get_asset(id: u128) -> AssetQuery{
         let state = state.borrow();
         match state.assets.get(&id){
             None => ic_cdk::trap("Asset not found"),
-            Some(asset) => AssetQuery::from(&asset)
+            Some(asset) => AssetQuery::from(&*asset)
         }
     })
 }
@@ -111,59 +115,59 @@ pub fn get_asset(id: u128) -> AssetQuery{
 #[query]
 #[candid_method(query)]
 pub fn asset_list() -> HashMap<u128, AssetQuery>{
-    STATE.with(|state| state.borrow().assets.iter().map(|(id, asset)| (id, AssetQuery::from(&asset))).collect())
+    STATE.with(|state| state.borrow().assets.iter().map(|(id, asset)| (*id, AssetQuery::from(&*asset))).collect())
 }
 
-#[update]
-#[candid_method(update)]
-pub fn insert_chunk(){
-   STATE.with(|state|{
-        let mut state = state.borrow_mut();
-        for id in 0..100{
-            let chunk = Chunk{
-                content: [0; 2000].to_vec(),
-                order: 1,
-                owner: ic_cdk::id(),
-                created_at: ic_cdk::api::time(),
-                checksum: 200,
-                id: 10        
-           };
-            state.chunks.insert(id, chunk);
-        }
-   })
-}
+// #[update]
+// #[candid_method(update)]
+// pub fn insert_chunk(){
+//    STATE.with(|state|{
+//         let mut state = state.borrow_mut();
+//         for id in 0..100{
+//             let chunk = StaChunk{
+//                 content: [0; 2000].to_vec(),
+//                 order: 1,
+//                 owner: ic_cdk::id(),
+//                 created_at: ic_cdk::api::time(),
+//                 checksum: 200,
+//                 id: 10        
+//            };
+//             state.chunks.insert(id, chunk);
+//         }
+//    })
+// }
 
-#[update]
-#[candid_method(update)]
-pub fn insert_asset(){
-    STATE.with(|state|{
-        let mut state = state.borrow_mut();
-        for id in 0..100{
-            let asset = Asset{
-                content: [0; 4000].to_vec(),
-                file_name: "".into(),
-                owner: Principal::anonymous(),
-                content_encoding: ContentEncoding::GZIP,
-                url: "".to_string(),
-                id: 100,
-                content_type: "".into()
-            };
-            state.assets.insert(id, asset);
-        }
-   })
-}
+// #[update]
+// #[candid_method(update)]
+// pub fn insert_asset(){
+//     STATE.with(|state|{
+//         let mut state = state.borrow_mut();
+//         for id in 0..100{
+//             let asset = Asset{
+//                 content: [0; 4000].to_vec(),
+//                 file_name: "".into(),
+//                 owner: Principal::anonymous(),
+//                 content_encoding: ContentEncoding::GZIP,
+//                 url: "".to_string(),
+//                 id: 100,
+//                 content_type: "".into()
+//             };
+//             state.assets.insert(id, asset);
+//         }
+//    })
+// }
 
-#[update]
-#[candid_method(update)]
-pub fn increase_pages(n: u64) -> bool{
-    match ic_cdk::api::stable::stable64_grow(n){
-        Ok(res) => {
-            ic_cdk::println!("{}", res);
-            true
-        },
-        Err(e) => {
-            ic_cdk::println!("{:?}", e);
-            false
-        }
-    }
-}
+// #[update]
+// #[candid_method(update)]
+// pub fn increase_pages(n: u64) -> bool{
+//     match ic_cdk::api::stable::stable64_grow(n){
+//         Ok(res) => {
+//             ic_cdk::println!("{}", res);
+//             true
+//         },
+//         Err(e) => {
+//             ic_cdk::println!("{:?}", e);
+//             false
+//         }
+//     }
+// }

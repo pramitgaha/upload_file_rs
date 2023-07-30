@@ -1,4 +1,4 @@
-use crate::{asset_handler::*, chunk_handler::*, types::*};
+use crate::{chunk_handler::*, types::*, asset_handler::*};
 use candid::export_service;
 use ic_cdk_macros::query;
 use std::collections::HashMap;
